@@ -1,11 +1,11 @@
 // Service worker for "Карманный бюджет": keeps the app working without internet.
 // When you publish a new version of index.html, change the number in CACHE (v1 -> v2).
-const CACHE = 'pocket-budget-v1';
+const CACHE = 'pocket-budget-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE).then((cache) => cache.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())
   );
 });
 

@@ -165,6 +165,16 @@
   .hint-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .hint-bar .link { color: var(--accent); flex: none; }
   .hint:empty { display: none; }
+  .hero-links { display: flex; align-items: center; gap: 14px; flex: none; }
+  .hist { display: flex; flex-direction: column; gap: 16px; }
+  .days { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+  .days summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; font-weight: 700; cursor: pointer; list-style: none; }
+  .days summary::-webkit-details-marker { display: none; }
+  .days summary::after { content: "+"; font-size: 22px; line-height: 1; color: var(--muted); }
+  .days[open] summary::after { content: "\2212"; }
+  .days-body { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
+  .days-body .item:last-child { border-bottom: 0; }
+  .item.today .what { font-weight: 700; }
 
   section[hidden] { display: none; }
   .tab-body { display: flex; flex-direction: column; gap: 16px; }
@@ -351,6 +361,11 @@
       <button class="btn" type="submit">Добавить трату</button>
     </form>
 
+    <details class="days" id="daysBox" hidden>
+      <summary>Лимит по дням</summary>
+      <div class="days-body" id="daysList"></div>
+    </details>
+
     <div id="expenseList"></div>
     <div id="history" class="hist"></div>
   </section>
@@ -389,7 +404,7 @@
   <div class="tabbar-in">
     <button class="tab" type="button" data-act="tab" data-tab="month" aria-current="page">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-      Месяц
+      Бюджет
     </button>
     <button class="tab" type="button" data-act="tab" data-tab="stats">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
@@ -404,21 +419,34 @@
 
 <div class="overlay" id="budgetSheet" role="dialog" aria-modal="true" aria-labelledby="budgetTitle" hidden>
   <form class="sheet" id="budgetForm" novalidate autocomplete="off">
-    <div>
-      <p class="eyebrow" id="budgetEyebrow"></p>
-      <h2 id="budgetTitle">Новый месяц</h2>
-    </div>
-    <p class="hint" id="budgetHint">Сколько вы готовы потратить в этом месяце? По этой сумме я посчитаю, сколько можно тратить в день.</p>
-    <label class="lbl" for="budgetInput"><span class="lbl-t">Сумма на месяц, <span class="cur-label"></span></span>
+    <h2 id="budgetTitle">Новый период</h2>
+    <p class="hint" id="budgetHint"></p>
+    <label class="lbl" for="budgetInput"><span class="lbl-t">Сумма на период, <span class="cur-label"></span></span>
       <input id="budgetInput" class="field" inputmode="decimal" placeholder="Например, 60 000">
     </label>
+    <div class="row2 eq">
+      <label class="lbl" for="periodStart"><span class="lbl-t">С даты</span>
+        <input id="periodStart" class="field" type="date">
+      </label>
+      <label class="lbl" for="periodEnd"><span class="lbl-t">По дату</span>
+        <input id="periodEnd" class="field" type="date">
+      </label>
+    </div>
+    <div class="chips" role="group" aria-label="Быстрый выбор срока">
+      <button class="chip" type="button" data-act="range" data-r="month">До конца месяца</button>
+      <button class="chip" type="button" data-act="range" data-r="7">7 дней</button>
+      <button class="chip" type="button" data-act="range" data-r="14">14 дней</button>
+      <button class="chip" type="button" data-act="range" data-r="30">30 дней</button>
+    </div>
+    <p class="hint" id="rangeHint" role="status"></p>
     <fieldset class="carry" id="carryBox" hidden>
-      <legend>Остаток за <span id="prevName"></span>: <span id="prevLeft"></span></legend>
+      <legend>Остаток прошлого периода (<span id="prevName"></span>): <span id="prevLeft"></span></legend>
       <label class="opt"><input type="radio" name="carry" value="none" checked><span>Не учитывать</span></label>
-      <label class="opt"><input type="radio" name="carry" value="carry"><span>Добавить к бюджету этого месяца</span></label>
+      <label class="opt"><input type="radio" name="carry" value="carry"><span>Добавить к бюджету нового периода</span></label>
       <label class="opt"><input type="radio" name="carry" value="save"><span id="carrySaveLbl">Отложить в копилку</span></label>
     </fieldset>
     <p class="err" id="budgetErr" role="alert"></p>
+    <button type="button" class="link danger" id="periodDelete" data-act="delete-period" hidden>Удалить период</button>
     <div class="actions">
       <button type="button" class="btn ghost" data-act="close-sheet">Позже</button>
       <button type="submit" class="btn">Сохранить</button>
@@ -481,6 +509,11 @@
     <label class="lbl" for="currencySel"><span class="lbl-t">Валюта</span>
       <select id="currencySel" class="field"></select>
     </label>
+    <div class="lbl" id="badgeBox" hidden>
+      <span class="lbl-t">Число на иконке</span>
+      <label class="opt"><input type="checkbox" id="badgeToggle"><span>Показывать на иконке приложения, сколько можно потратить сегодня</span></label>
+      <p class="hint" id="badgeMsg" role="status"></p>
+    </div>
     <p class="hint" id="storageNote"></p>
     <div class="lbl"><span class="lbl-t">Резервная копия</span>
       <button type="button" class="btn ghost" data-act="copy-backup">Скопировать данные</button>
@@ -505,7 +538,12 @@
   const $$ = (s) => Array.prototype.slice.call(document.querySelectorAll(s));
   const pad = (n) => String(n).padStart(2, '0');
   const dateStr = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-  const monthKeyOf = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1);
+  const parseDate = (s) => { const p = String(s).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); };
+  const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && dateStr(parseDate(s)) === s;
+  const addDays = (s, n) => { const d = parseDate(s); d.setDate(d.getDate() + n); return dateStr(d); };
+  const diffDays = (a, b) => Math.round((parseDate(b) - parseDate(a)) / 86400000);
+  const lastOfMonth = (s) => { const d = parseDate(s); return dateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0)); };
+  const daysIn = (p) => diffDays(p.start, p.end) + 1;
   const newId = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
   const r2 = (x) => Math.round(x * 100) / 100;
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -521,6 +559,17 @@
     try { return new Intl.NumberFormat('ru-RU', { notation: 'compact', maximumFractionDigits: 1 }); } catch (e) { return nf0; }
   })();
   const NB = ' ';
+  const dfShort = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
+  const fmtShort = (s) => dfShort.format(parseDate(s)).replace(/\.$/, '');
+
+  function fmtRange(p, now) {
+    if (p.start === p.end) return fmtShort(p.start) + (parseDate(p.start).getFullYear() !== now.getFullYear() ? ' ' + parseDate(p.start).getFullYear() : '');
+    const sy = parseDate(p.start).getFullYear();
+    const ey = parseDate(p.end).getFullYear();
+    let out = fmtShort(p.start) + (sy !== ey ? ' ' + sy : '') + ' – ' + fmtShort(p.end);
+    if (ey !== now.getFullYear() || sy !== ey) out += ' ' + ey;
+    return out;
+  }
 
   const CURRENCIES = ['₽', '$', '€', '£', '₴', '₸', 'kr'];
   const LS_KEY = 'moy-byudzhet-v1';
@@ -546,13 +595,16 @@
   const S = {
     ready: false,
     tab: 'month',
-    statsKey: '',
-    settings: { currency: '₽', palette: 'green' },
-    months: {},
+    statsId: '',
+    settings: { currency: '₽', palette: 'green', badge: false },
+    periods: [],
+    expenses: [],
     savings: { jars: [{ id: 'main', name: 'Копилка', goal: 0, entries: [] }], active: 'main' },
     promptShown: false,
     today: dateStr(new Date()),
-    editId: null
+    editId: null,
+    editPeriodId: null,
+    badgeValue: 0
   };
 
   const cur = () => S.settings.currency || '₽';
@@ -562,15 +614,17 @@
   const sumAmt = (arr) => arr.reduce((a, e) => a + (Number(e.amount) || 0), 0);
   const bigHtml = (n) => esc(nf0.format(n)) + '<small>' + esc(cur()) + '</small>';
   const activeJar = () => S.savings.jars.filter((j) => j.id === S.savings.active)[0] || S.savings.jars[0];
+  function signed(x) {
+    const v = Math.floor(x + 1e-6);
+    return (v > 0 ? '+' : v < 0 ? '−' : '') + nf0.format(Math.abs(v)) + NB + cur();
+  }
 
   function monthName(y, m0) {
     const s = new Intl.DateTimeFormat('ru-RU', { month: 'long' }).format(new Date(y, m0, 1));
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
-  function keyParts(key) { const p = key.split('-'); return { y: +p[0], m0: +p[1] - 1 }; }
   function dayLabel(ds, now) {
-    const p = String(ds).split('-');
-    const d = new Date(+p[0], +p[1] - 1, +p[2]);
+    const d = parseDate(ds);
     const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const diff = Math.round((t0 - d) / 86400000);
     if (diff === 0) return 'Сегодня';
@@ -601,7 +655,7 @@
   function cleanList(arr) {
     if (!Array.isArray(arr)) return [];
     return arr
-      .filter((x) => x && typeof x === 'object' && typeof x.date === 'string')
+      .filter((x) => x && typeof x === 'object' && isDate(x.date))
       .map((x) => Object.assign({}, x, { amount: Number(x.amount) || 0, id: String(x.id || newId()) }));
   }
   function normSavings(v) {
@@ -617,34 +671,73 @@
     const active = jars.some((j) => j.id === v.active) ? v.active : jars[0].id;
     return { jars: jars, active: active };
   }
+  function sortPeriods() {
+    S.periods.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+  }
+  function normPeriods(arr) {
+    if (!Array.isArray(arr)) return [];
+    const seen = {};
+    const out = arr
+      .filter((p) => p && typeof p === 'object' && isDate(p.start) && isDate(p.end) && p.start <= p.end)
+      .map((p) => ({
+        id: String(p.id || newId()),
+        start: p.start,
+        end: p.end,
+        budget: Number(p.budget) || 0,
+        carry: Number(p.carry) || 0,
+        settled: typeof p.settled === 'string' ? p.settled : ''
+      }))
+      .filter((p) => (seen[p.id] ? false : (seen[p.id] = true)));
+    return out;
+  }
+
+  /* Reads the stored documents into S. Returns true when old month-based data was converted. */
   function applyDocs(map) {
     const clean = JSON.parse(JSON.stringify(map));
-    S.settings = { currency: '₽', palette: 'green' };
+    S.settings = { currency: '₽', palette: 'green', badge: false };
     S.savings = normSavings({});
-    S.months = {};
-    Object.keys(clean).forEach((k) => {
-      const v = clean[k] || {};
-      if (k === 'settings') {
-        S.settings = {
-          currency: CURRENCIES.indexOf(v.currency) >= 0 ? v.currency : '₽',
-          palette: PALETTES.some((p) => p.id === v.palette) ? v.palette : 'green'
-        };
-      } else if (k === 'savings') {
-        S.savings = normSavings(v);
-      } else if (k.indexOf('m-') === 0) {
-        S.months[k.slice(2)] = {
+    S.periods = [];
+    S.expenses = [];
+    let migrated = false;
+    const st = clean.settings;
+    if (st && typeof st === 'object') {
+      S.settings = {
+        currency: CURRENCIES.indexOf(st.currency) >= 0 ? st.currency : '₽',
+        palette: PALETTES.some((p) => p.id === st.palette) ? st.palette : 'green',
+        badge: st.badge === true
+      };
+    }
+    if (clean.savings && typeof clean.savings === 'object') S.savings = normSavings(clean.savings);
+    if (clean.periods && typeof clean.periods === 'object') {
+      S.periods = normPeriods(clean.periods.list);
+      if (clean.expenses && typeof clean.expenses === 'object') S.expenses = cleanList(clean.expenses.list);
+    } else {
+      Object.keys(clean).forEach((k) => {
+        const m = /^m-(\d{4})-(\d{2})$/.exec(k);
+        if (!m) return;
+        const v = clean[k] || {};
+        const start = m[1] + '-' + m[2] + '-01';
+        if (!isDate(start)) return;
+        S.periods.push({
+          id: 'm' + m[1] + m[2],
+          start: start,
+          end: lastOfMonth(start),
           budget: Number(v.budget) || 0,
           carry: Number(v.carry) || 0,
-          settled: v.settled || '',
-          expenses: cleanList(v.expenses)
-        };
-      }
-    });
+          settled: typeof v.settled === 'string' ? v.settled : ''
+        });
+        cleanList(v.expenses).forEach((e) => { S.expenses.push(e); });
+        migrated = true;
+      });
+    }
+    sortPeriods();
+    return migrated;
   }
   function docOf(key) {
     if (key === 'settings') return S.settings;
     if (key === 'savings') return S.savings;
-    return S.months[key.slice(2)];
+    if (key === 'periods') return { list: S.periods };
+    return { list: S.expenses };
   }
   function persist(key) {
     const data = JSON.parse(JSON.stringify(docOf(key)));
@@ -654,9 +747,26 @@
   }
   function mutate(key, fn) { fn(); persist(key); render(); }
 
+  function loadDocs(docs) {
+    localDocs = docs;
+    const migrated = applyDocs(localDocs);
+    if (migrated) {
+      const next = Object.assign({}, localDocs, {
+        periods: JSON.parse(JSON.stringify(docOf('periods'))),
+        expenses: JSON.parse(JSON.stringify(docOf('expenses')))
+      });
+      Object.keys(next).forEach((k) => { if (/^m-\d{4}-\d{2}$/.test(k)) delete next[k]; });
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(next));
+        localDocs = next;
+      } catch (err) { /* keep the old data as it is */ }
+    }
+  }
+
   function initStore() {
-    try { localDocs = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) { localDocs = {}; }
-    applyDocs(localDocs);
+    let docs = {};
+    try { docs = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) { docs = {}; }
+    loadDocs(docs);
     writer = (key, data) => {
       localDocs[key] = data;
       localStorage.setItem(LS_KEY, JSON.stringify(localDocs));
@@ -668,26 +778,57 @@
 
   /* ---------- calculations ---------- */
 
-  function monthStats(m, now) {
-    const total = m.budget + m.carry;
-    const spent = sumAmt(m.expenses);
+  function expensesOf(p) { return S.expenses.filter((e) => e.date >= p.start && e.date <= p.end); }
+  function periodAt(ds) {
+    let best = null;
+    S.periods.forEach((p) => { if (p.start <= ds && ds <= p.end && (!best || p.start >= best.start)) best = p; });
+    return best;
+  }
+  function nextPeriod(ds) { return S.periods.filter((p) => p.start > ds)[0] || null; }
+
+  /* Today's limit is what is left of the budget divided by the days left, so whatever was
+     spent or saved on earlier days is already spread over the days that remain. */
+  function periodStats(p, ts, list) {
+    const total = p.budget + p.carry;
+    const spent = sumAmt(list);
+    const spentBefore = sumAmt(list.filter((e) => e.date < ts));
+    const spentToday = sumAmt(list.filter((e) => e.date === ts));
+    const daysLeft = Math.max(diffDays(ts, p.end) + 1, 1);
     const remaining = total - spent;
-    const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const daysLeft = dim - now.getDate() + 1;
-    const ts = dateStr(now);
-    const spentToday = sumAmt(m.expenses.filter((e) => e.date === ts));
-    const dailyLimit = (total - (spent - spentToday)) / daysLeft;
-    return { total, spent, remaining, daysLeft, spentToday, dailyLimit, todayLeft: dailyLimit - spentToday };
+    const dailyLimit = (total - spentBefore) / daysLeft;
+    return {
+      total, spent, remaining, daysLeft, spentToday, dailyLimit,
+      todayLeft: dailyLimit - spentToday,
+      tomorrow: daysLeft > 1 ? remaining / (daysLeft - 1) : null
+    };
   }
 
-  function findPrev(k) {
-    const keys = Object.keys(S.months).filter((x) => x < k).sort().reverse();
-    if (!keys.length) return null;
-    const key = keys[0];
-    const pm = S.months[key];
-    if (pm.settled) return null;
-    const left = r2(pm.budget + pm.carry - sumAmt(pm.expenses));
-    return left > 0.005 ? { key, left } : null;
+  function dayRows(p, list, ts) {
+    const total = p.budget + p.carry;
+    const by = {};
+    list.forEach((e) => { by[e.date] = (by[e.date] || 0) + e.amount; });
+    const last = ts < p.end ? ts : p.end;
+    const n = diffDays(p.start, last) + 1;
+    const rows = [];
+    let before = 0;
+    for (let i = 0; i < n; i++) {
+      const d = addDays(p.start, i);
+      const left = diffDays(d, p.end) + 1;
+      const limit = (total - before) / left;
+      const spent = by[d] || 0;
+      rows.push({ date: d, limit: limit, spent: spent, diff: limit - spent });
+      before += spent;
+    }
+    return rows;
+  }
+
+  function findPrev(start) {
+    const prevs = S.periods.filter((p) => p.end < start && p.end < S.today);
+    if (!prevs.length) return null;
+    const p = prevs[prevs.length - 1];
+    if (p.settled) return null;
+    const left = r2(p.budget + p.carry - sumAmt(expensesOf(p)));
+    return left > 0.005 ? { p: p, left: left } : null;
   }
 
   /* ---------- rendering ---------- */
@@ -695,24 +836,38 @@
   function render() {
     const now = new Date();
     S.today = dateStr(now);
+    const act = periodAt(S.today);
     document.documentElement.setAttribute('data-palette', S.settings.palette);
-    renderChrome(now);
+    renderChrome(now, act);
     if (!S.ready) {
       const loading = '<p class="hero-label">Загружаю данные</p><p class="hero-big">…</p>';
       $('#hero').className = 'hero'; $('#hero').innerHTML = loading;
       $('#saveHero').className = 'hero'; $('#saveHero').innerHTML = loading;
       return;
     }
-    renderMonth(now);
-    if (S.tab === 'stats') renderStats(now);
+    renderMonth(now, act);
+    if (S.tab === 'stats') renderStats(now, act);
     renderSavings(now);
     renderPalette();
-    syncDateInput(now);
-    maybePrompt(now);
+    syncDateInput(act);
+    syncBadge();
+    maybePrompt(act);
   }
 
-  function renderChrome(now) {
-    $('#eyebrow').textContent = monthName(now.getFullYear(), now.getMonth()) + ' ' + now.getFullYear();
+  function isStandalone() {
+    return window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  }
+  function hintVisible() {
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(LS_KEY + '-hint') === '1'; } catch (err) { dismissed = false; }
+    return /iPhone|iPad|iPod/.test(navigator.userAgent) && !isStandalone() && !dismissed;
+  }
+
+  function renderChrome(now, act) {
+    $('#eyebrow').textContent = S.tab === 'month' && act
+      ? fmtRange(act, now)
+      : monthName(now.getFullYear(), now.getMonth()) + ' ' + now.getFullYear();
     $('#pageTitle').textContent = S.tab === 'month' ? 'Бюджет' : S.tab === 'stats' ? 'Статистика' : 'Копилки';
     $('#tabMonth').hidden = S.tab !== 'month';
     $('#tabStats').hidden = S.tab !== 'stats';
@@ -724,14 +879,12 @@
     $('#notice').hidden = !hintVisible();
   }
 
-  function syncDateInput(now) {
-    const k = monthKeyOf(now);
-    const min = k + '-01';
-    const max = dateStr(now);
+  function syncDateInput(act) {
+    if (!act) return;
     const el = $('#expDate');
-    el.min = min;
-    el.max = max;
-    if (!el.value || el.value < min || el.value > max) el.value = max;
+    el.min = act.start;
+    el.max = S.today;
+    if (!el.value || el.value < el.min || el.value > el.max) el.value = S.today;
   }
 
   function renderPalette() {
@@ -741,68 +894,89 @@
     ).join('');
   }
 
-  function renderMonth(now) {
-    const k = monthKeyOf(now);
-    const m = S.months[k];
+  function renderMonth(now, act) {
     const hero = $('#hero');
-    if (!m) {
+    if (!act) {
+      S.badgeValue = 0;
+      const nxt = nextPeriod(S.today);
       hero.className = 'hero';
       hero.innerHTML =
-        '<p class="hero-label">Сумма на месяц не задана</p>' +
+        '<p class="hero-label">Бюджет на сегодня не задан</p>' +
         '<p class="hero-big">—</p>' +
-        '<p class="hero-foot">Укажите, сколько можно потратить в этом месяце, и я посчитаю дневной лимит.</p>' +
-        '<button class="btn light" type="button" data-act="open-budget">Задать сумму</button>';
+        '<p class="hero-foot">' + (nxt ? 'Следующий период начнётся ' + esc(fmtShort(nxt.start)) + '. ' : '') +
+        'Укажите сумму и даты, и я посчитаю дневной лимит.</p>' +
+        '<button class="btn light" type="button" data-act="open-budget">Задать бюджет</button>';
       $('#expenseForm').hidden = true;
+      $('#daysBox').hidden = true;
       $('#expenseList').innerHTML = '';
-    } else {
-      const st = monthStats(m, now);
-      const monthOver = st.remaining < -0.005;
-      const dayOver = !monthOver && st.todayLeft < -0.005;
-      const share = st.total > 0 ? st.spent / st.total : 0;
-      const pills = [];
-      if (monthOver) {
-        pills.push('Бюджет месяца превышен');
-      } else {
-        if (dayOver) pills.push('Дневной лимит превышен');
-        else if (st.dailyLimit > 0 && st.spentToday > 0 && st.spentToday >= st.dailyLimit * 0.8 - 1e-9) pills.push('Дневной лимит почти выбран');
-        if (share >= 0.8 - 1e-9) pills.push('Потрачено ' + Math.floor(share * 100 + 1e-6) + '% бюджета');
-      }
-      const over = monthOver || dayOver;
-      const warn = !over && pills.length > 0;
-      let label = 'Сегодня можно потратить';
-      let value = st.todayLeft;
-      if (monthOver) { label = 'Перерасход за месяц'; value = -st.remaining; }
-      else if (dayOver) { label = 'Сегодня выше лимита на'; value = -st.todayLeft; }
-      const shown = over ? Math.ceil(value - 1e-6) : Math.floor(value + 1e-6);
-      const pct = Math.max(0, Math.min(100, share * 100));
-      const carryTxt = m.carry > 0 ? ' · с остатком ' + esc(money0(m.carry)) : '';
-      hero.className = 'hero' + (over ? ' over' : warn ? ' warn' : '');
-      hero.innerHTML =
-        '<div class="hero-top"><p class="hero-label">' + esc(label) + '</p>' +
-        '<button class="link" type="button" data-act="open-budget">Изменить</button></div>' +
-        '<p class="hero-big">' + bigHtml(Math.max(shown, 0)) + '</p>' +
-        (pills.length ? '<div class="pills">' + pills.map((t) => '<span class="pill">' + esc(t) + '</span>').join('') + '</div>' : '') +
-        '<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(pct) + '" aria-label="Потрачено за месяц"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
-        '<p class="hero-foot">Потрачено ' + esc(money0(st.spent)) + ' из ' + esc(money0(st.total)) + carryTxt + '</p>' +
-        '<dl class="stats">' +
-        '<div><dt>Лимит на день</dt><dd>' + esc(money0(Math.max(down(st.dailyLimit), 0))) + '</dd></div>' +
-        '<div><dt>Осталось</dt><dd>' + esc(money0(down(st.remaining))) + '</dd></div>' +
-        '<div><dt>До конца месяца</dt><dd>' + st.daysLeft + NB + plural(st.daysLeft, 'день', 'дня', 'дней') + '</dd></div>' +
-        '</dl>';
-      $('#expenseForm').hidden = false;
-      renderExpenses(m, now);
+      renderHistory(now);
+      return;
     }
-    renderHistory(k);
+    const list = expensesOf(act);
+    const st = periodStats(act, S.today, list);
+    const periodOver = st.remaining < -0.005;
+    const dayOver = !periodOver && st.todayLeft < -0.005;
+    const share = st.total > 0 ? st.spent / st.total : 0;
+    const pills = [];
+    if (periodOver) {
+      pills.push('Бюджет периода превышен');
+    } else {
+      if (dayOver) pills.push('Дневной лимит превышен');
+      else if (st.dailyLimit > 0 && st.spentToday > 0 && st.spentToday >= st.dailyLimit * 0.8 - 1e-9) pills.push('Дневной лимит почти выбран');
+      if (share >= 0.8 - 1e-9) pills.push('Потрачено ' + Math.floor(share * 100 + 1e-6) + '% бюджета');
+    }
+    const over = periodOver || dayOver;
+    const warn = !over && pills.length > 0;
+    let label = 'Сегодня можно потратить';
+    let value = st.todayLeft;
+    if (periodOver) { label = 'Перерасход за период'; value = -st.remaining; }
+    else if (dayOver) { label = 'Сегодня выше лимита на'; value = -st.todayLeft; }
+    const shown = over ? Math.ceil(value - 1e-6) : Math.floor(value + 1e-6);
+    const pct = Math.max(0, Math.min(100, share * 100));
+    const carryTxt = act.carry > 0 ? ' · с остатком ' + esc(money0(act.carry)) : '';
+    const left = st.daysLeft === 1 ? 'сегодня последний день' : 'осталось ' + st.daysLeft + NB + plural(st.daysLeft, 'день', 'дня', 'дней');
+    S.badgeValue = over ? 0 : Math.max(0, Math.floor(st.todayLeft + 1e-6));
+    hero.className = 'hero' + (over ? ' over' : warn ? ' warn' : '');
+    hero.innerHTML =
+      '<div class="hero-top"><p class="hero-label">' + esc(label) + '</p>' +
+      '<span class="hero-links"><button class="link" type="button" data-act="edit-period" data-id="' + esc(act.id) + '">Изменить</button>' +
+      '<button class="link" type="button" data-act="open-budget">+ Период</button></span></div>' +
+      '<p class="hero-big">' + bigHtml(Math.max(shown, 0)) + '</p>' +
+      (pills.length ? '<div class="pills">' + pills.map((t) => '<span class="pill">' + esc(t) + '</span>').join('') + '</div>' : '') +
+      '<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(pct) + '" aria-label="Потрачено за период"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
+      '<p class="hero-foot">Потрачено ' + esc(money0(st.spent)) + ' из ' + esc(money0(st.total)) + carryTxt + '</p>' +
+      '<p class="hero-foot">' + esc(fmtRange(act, now)) + ' · ' + esc(left) + '</p>' +
+      '<dl class="stats">' +
+      '<div><dt>Лимит на сегодня</dt><dd>' + esc(money0(Math.max(down(st.dailyLimit), 0))) + '</dd></div>' +
+      '<div><dt>Завтра будет</dt><dd>' + (st.tomorrow === null ? '—' : esc(money0(Math.max(down(st.tomorrow), 0)))) + '</dd></div>' +
+      '<div><dt>Осталось всего</dt><dd>' + esc(money0(down(st.remaining))) + '</dd></div>' +
+      '</dl>';
+    $('#expenseForm').hidden = false;
+    $('#daysBox').hidden = false;
+    renderDays(act, list, now);
+    renderExpenses(list, now);
+    renderHistory(now);
   }
 
-  function renderExpenses(m, now) {
+  function renderDays(act, list, now) {
+    const rows = dayRows(act, list, S.today).reverse();
+    $('#daysList').innerHTML =
+      '<p class="note">Лимит каждого дня пересчитывается: что не потратили, прибавляется к следующим дням, а перерасход уменьшает их.</p>' +
+      '<ul>' + rows.map((r, i) =>
+        '<li class="item' + (i === 0 ? ' today' : '') + '"><span class="item-plain"><span class="what">' + esc(dayLabel(r.date, now)) +
+        '<span class="sub">лимит ' + esc(money0(Math.max(down(r.limit), 0))) + ' · потрачено ' + esc(money0(down(r.spent))) + '</span></span>' +
+        '<span class="sum ' + (r.diff >= -0.005 ? 'plus' : 'minus') + '">' + esc(signed(r.diff)) + '</span></span></li>'
+      ).join('') + '</ul>';
+  }
+
+  function renderExpenses(list, now) {
     const box = $('#expenseList');
-    if (!m.expenses.length) {
+    if (!list.length) {
       box.innerHTML = '<p class="empty">Трат пока нет. Добавьте первую выше, и лимит пересчитается.</p>';
       return;
     }
     const byDate = {};
-    m.expenses.forEach((e) => { (byDate[e.date] = byDate[e.date] || []).push(e); });
+    list.forEach((e) => { (byDate[e.date] = byDate[e.date] || []).push(e); });
     const dates = Object.keys(byDate).sort().reverse();
     box.innerHTML = dates.map((d) => {
       const items = byDate[d].slice().sort((a, b) => (b.t || 0) - (a.t || 0));
@@ -817,38 +991,47 @@
     }).join('');
   }
 
-  function renderHistory(k) {
+  function renderHistory(now) {
     const box = $('#history');
-    const keys = Object.keys(S.months).filter((x) => x < k).sort().reverse().slice(0, 12);
-    if (!keys.length) { box.innerHTML = ''; return; }
-    box.innerHTML = '<p class="group-title">Прошлые месяцы</p><ul>' + keys.map((key) => {
-      const pm = S.months[key];
-      const p = keyParts(key);
-      const total = pm.budget + pm.carry;
-      const left = total - sumAmt(pm.expenses);
-      const note = pm.settled === 'carry' ? ' · остаток перенесён' : pm.settled === 'save' ? ' · остаток в копилке' : '';
-      return '<li class="item"><span class="item-plain"><span class="what"><b>' + esc(monthName(p.y, p.m0)) + ' ' + p.y + '</b>' +
-        '<span class="sub">Потрачено ' + esc(money0(sumAmt(pm.expenses))) + ' из ' + esc(money0(total)) + esc(note) + '</span></span>' +
-        '<span class="sum ' + (left < -0.005 ? 'over-txt' : '') + '">' + esc((left > 0.005 ? '+' : '') + nf0.format(down(left)) + NB + cur()) + '</span></span></li>';
-    }).join('') + '</ul>';
+    let html = '';
+    const future = S.periods.filter((p) => p.start > S.today);
+    if (future.length) {
+      html += '<div><p class="group-title">Запланированные</p><ul>' + future.map((p) =>
+        '<li class="item"><button class="item-main" type="button" data-act="edit-period" data-id="' + esc(p.id) + '">' +
+        '<span class="what"><b>' + esc(fmtRange(p, now)) + '</b><span class="sub">' + daysIn(p) + NB + plural(daysIn(p), 'день', 'дня', 'дней') + '</span></span>' +
+        '<span class="sum">' + esc(money0(p.budget + p.carry)) + '</span></button></li>'
+      ).join('') + '</ul></div>';
+    }
+    const past = S.periods.filter((p) => p.end < S.today).slice().reverse().slice(0, 12);
+    if (past.length) {
+      html += '<div><p class="group-title">Прошлые периоды</p><ul>' + past.map((p) => {
+        const total = p.budget + p.carry;
+        const left = total - sumAmt(expensesOf(p));
+        const note = p.settled === 'carry' ? ' · остаток перенесён' : p.settled === 'save' ? ' · остаток в копилке' : '';
+        return '<li class="item"><span class="item-plain"><span class="what"><b>' + esc(fmtRange(p, now)) + '</b>' +
+          '<span class="sub">Потрачено ' + esc(money0(sumAmt(expensesOf(p)))) + ' из ' + esc(money0(total)) + esc(note) + '</span></span>' +
+          '<span class="sum ' + (left < -0.005 ? 'over-txt' : '') + '">' + esc((left > 0.005 ? '+' : '') + nf0.format(down(left)) + NB + cur()) + '</span></span></li>';
+      }).join('') + '</ul></div>';
+    }
+    box.innerHTML = html;
   }
 
   /* ---------- statistics ---------- */
 
-  function dailyChartSvg(m, dim, avgLimit) {
-    const daily = new Array(dim).fill(0);
-    m.expenses.forEach((e) => {
-      const d = parseInt(String(e.date).slice(8, 10), 10);
-      if (d >= 1 && d <= dim) daily[d - 1] += e.amount;
+  function dailyChartSvg(p, list, len, avgLimit) {
+    const daily = new Array(len).fill(0);
+    list.forEach((e) => {
+      const i = diffDays(p.start, e.date);
+      if (i >= 0 && i < len) daily[i] += e.amount;
     });
     const peak = Math.max.apply(null, daily);
     const top = niceCeil(Math.max(peak, avgLimit));
     const W = 340, H = 176, L = 42, R = 6, T = 10, B = 24;
     const pw = W - L - R, ph = H - T - B;
-    const step = pw / dim;
-    const bw = Math.max(step * 0.66, 2);
+    const step = pw / len;
+    const bw = Math.max(step * 0.66, 1);
     const yOf = (v) => T + ph - (v / top) * ph;
-    let s = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc('Траты по дням месяца. Максимум за день: ' + money0(peak)) + '">';
+    let s = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc('Траты по дням. Максимум за день: ' + money0(peak)) + '">';
     [0, top / 2, top].forEach((v) => {
       const y = yOf(v);
       s += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '"/>';
@@ -859,65 +1042,74 @@
       const x = L + i * step + (step - bw) / 2;
       const y = yOf(v);
       const isOver = v > avgLimit + 0.005;
-      s += '<rect class="' + (isOver ? 'b-over' : 'b-ok') + '" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + (T + ph - y).toFixed(1) + '" rx="1.5"><title>' + esc((i + 1) + '-го числа: ' + money0(v)) + '</title></rect>';
+      s += '<rect class="' + (isOver ? 'b-over' : 'b-ok') + '" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + (T + ph - y).toFixed(1) + '" rx="1.5"><title>' + esc(fmtShort(addDays(p.start, i)) + ': ' + money0(v)) + '</title></rect>';
     });
     const yl = yOf(avgLimit).toFixed(1);
     s += '<line class="lim" x1="' + L + '" x2="' + (W - R) + '" y1="' + yl + '" y2="' + yl + '"/>';
-    [1, 5, 10, 15, 20, 25, dim].forEach((d) => {
-      const x = L + (d - 1) * step + step / 2;
-      s += '<text class="ax" x="' + x.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + d + '</text>';
-    });
+    let nl = 1;
+    if (len > 1) {
+      nl = 0;
+      [6, 5, 4, 3, 2].forEach((k) => { if (!nl && (len - 1) % (k - 1) === 0) nl = k; });
+      if (!nl) nl = len >= 15 ? 5 : 2;
+    }
+    const seen = {};
+    for (let k = 0; k < nl; k++) {
+      const i = nl === 1 ? 0 : Math.round((k * (len - 1)) / (nl - 1));
+      if (seen[i]) continue;
+      seen[i] = true;
+      const d = parseDate(addDays(p.start, i));
+      const txt = d.getDate() + '.' + pad(d.getMonth() + 1);
+      const anchor = i === 0 ? 'start' : i === len - 1 ? 'end' : 'middle';
+      const x = i === 0 ? L : i === len - 1 ? W - R : L + i * step + step / 2;
+      s += '<text class="ax" x="' + x.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + anchor + '">' + txt + '</text>';
+    }
     s += '</svg>';
-    return { svg: s, daily: daily, peak: peak };
+    return { svg: s, daily: daily };
   }
 
-  function renderStats(now) {
+  function renderStats(now, act) {
     const box = $('#statsBody');
-    const keys = Object.keys(S.months).sort();
-    const curKey = monthKeyOf(now);
-    if (!keys.length) {
-      box.innerHTML = '<p class="empty">Статистика появится, когда вы зададите сумму на месяц и добавите первые траты.</p>';
+    const ps = S.periods;
+    if (!ps.length) {
+      box.innerHTML = '<p class="empty">Статистика появится, когда вы зададите бюджет и добавите первые траты.</p>';
       return;
     }
-    let key = S.statsKey;
-    if (!key || !S.months[key]) key = S.months[curKey] ? curKey : keys[keys.length - 1];
-    S.statsKey = key;
-    const idx = keys.indexOf(key);
-    const m = S.months[key];
-    const p = keyParts(key);
-    $('#eyebrow').textContent = monthName(p.y, p.m0) + ' ' + p.y;
-    const dim = new Date(p.y, p.m0 + 1, 0).getDate();
-    const isCur = key === curKey;
-    const elapsed = isCur ? now.getDate() : dim;
-    const total = m.budget + m.carry;
-    const spent = sumAmt(m.expenses);
+    let p = ps.filter((x) => x.id === S.statsId)[0];
+    if (!p) p = act || ps.filter((x) => x.start <= S.today).pop() || ps[0];
+    S.statsId = p.id;
+    const idx = ps.indexOf(p);
+    $('#eyebrow').textContent = fmtRange(p, now);
+    const len = daysIn(p);
+    const elapsed = Math.max(0, Math.min(len, diffDays(p.start, S.today) + 1));
+    const total = p.budget + p.carry;
+    const list = expensesOf(p);
+    const spent = sumAmt(list);
 
     let html = '';
     html += '<div class="switch">' +
-      '<button class="icon-btn" type="button" data-act="stats-prev" aria-label="Предыдущий месяц"' + (idx <= 0 ? ' disabled' : '') + '>' + ARROW_L + '</button>' +
-      '<div class="switch-mid"><b>' + esc(monthName(p.y, p.m0)) + ' ' + p.y + '</b><span class="sub">Потрачено ' + esc(money0(spent)) + ' из ' + esc(money0(total)) + '</span></div>' +
-      '<button class="icon-btn" type="button" data-act="stats-next" aria-label="Следующий месяц"' + (idx >= keys.length - 1 ? ' disabled' : '') + '>' + ARROW_R + '</button>' +
+      '<button class="icon-btn" type="button" data-act="stats-prev" aria-label="Предыдущий период"' + (idx <= 0 ? ' disabled' : '') + '>' + ARROW_L + '</button>' +
+      '<div class="switch-mid"><b>' + esc(fmtRange(p, now)) + '</b><span class="sub">Потрачено ' + esc(money0(spent)) + ' из ' + esc(money0(total)) + '</span></div>' +
+      '<button class="icon-btn" type="button" data-act="stats-next" aria-label="Следующий период"' + (idx >= ps.length - 1 ? ' disabled' : '') + '>' + ARROW_R + '</button>' +
       '</div>';
 
-    if (!m.expenses.length) {
-      html += '<div class="panel"><p class="empty">В этом месяце трат пока нет.</p></div>';
+    if (!list.length) {
+      html += '<div class="panel"><p class="empty">В этом периоде трат пока нет.</p></div>';
     } else {
-      const chart = dailyChartSvg(m, dim, total / dim);
-      let peakDate = '';
-      let peakVal = 0;
-      chart.daily.forEach((v, i) => { if (v > peakVal) { peakVal = v; peakDate = key + '-' + pad(i + 1); } });
+      const chart = dailyChartSvg(p, list, len, total / len);
+      let peakVal = 0, peakIdx = 0;
+      chart.daily.forEach((v, i) => { if (v > peakVal) { peakVal = v; peakIdx = i; } });
       html += '<div class="panel"><dl class="sum-grid">' +
         '<div><dt>Потрачено</dt><dd>' + esc(money0(spent)) + '</dd></div>' +
-        '<div><dt>В среднем в день</dt><dd>' + esc(money0(spent / elapsed)) + '</dd></div>' +
-        '<div><dt>Пик за день</dt><dd>' + esc(money0(peakVal)) + '<span class="sub">' + esc(dayLabel(peakDate, now)) + '</span></dd></div>' +
+        '<div><dt>В среднем в день</dt><dd>' + esc(money0(elapsed > 0 ? spent / elapsed : 0)) + '</dd></div>' +
+        '<div><dt>Пик за день</dt><dd>' + esc(money0(peakVal)) + '<span class="sub">' + esc(dayLabel(addDays(p.start, peakIdx), now)) + '</span></dd></div>' +
         '</dl></div>';
 
-      html += '<div class="panel"><h3>По дням месяца</h3>' + chart.svg +
+      html += '<div class="panel"><h3>По дням</h3>' + chart.svg +
         '<ul class="legend"><li><i class="lg ok"></i>в пределах среднего лимита</li><li><i class="lg over"></i>выше лимита</li>' +
-        '<li><i class="lg line"></i>лимит ' + esc(money0(down(total / dim))) + ' в день</li></ul></div>';
+        '<li><i class="lg line"></i>лимит ' + esc(money0(down(total / len))) + ' в день</li></ul></div>';
 
       const sums = {};
-      m.expenses.forEach((e) => { const id = catOf(e.cat).id; sums[id] = (sums[id] || 0) + e.amount; });
+      list.forEach((e) => { const id = catOf(e.cat).id; sums[id] = (sums[id] || 0) + e.amount; });
       const rows = CATS.map((c) => ({ c: c, sum: sums[c.id] || 0 })).filter((r) => r.sum > 0).sort((a, b) => b.sum - a.sum);
       const maxSum = rows[0].sum;
       html += '<div class="panel"><h3>По категориям</h3><ul class="cat-list">' + rows.map((r) =>
@@ -927,31 +1119,30 @@
       ).join('') + '</ul></div>';
     }
 
-    const list = keys.slice(Math.max(0, idx - 5), idx + 1);
-    const vals = list.map((k) => { const mm = S.months[k]; return { k: k, spent: sumAmt(mm.expenses), total: mm.budget + mm.carry }; });
+    const upto = ps.slice(Math.max(0, idx - 5), idx + 1);
+    const vals = upto.map((x) => ({ p: x, spent: sumAmt(expensesOf(x)), total: x.budget + x.carry }));
     const scale = Math.max.apply(null, vals.map((v) => Math.max(v.spent, v.total))) || 1;
-    html += '<div class="panel"><h3>Сравнение с прошлыми месяцами</h3>';
+    html += '<div class="panel"><h3>Сравнение с прошлыми периодами</h3>';
     if (vals.length < 2) {
-      html += '<p class="note">Сравнение появится, когда у вас будет хотя бы два месяца с записями.</p>';
+      html += '<p class="note">Сравнение появится, когда у вас будет хотя бы два периода с записями.</p>';
     } else {
-      html += '<ul class="cmp-list">' + vals.slice().reverse().map((v) => {
-        const pp = keyParts(v.k);
-        return '<li class="cmp' + (v.k === key ? ' sel' : '') + '"><div class="cmp-head"><span class="cmp-m">' + esc(monthName(pp.y, pp.m0)) + ' ' + pp.y + '</span>' +
-          '<span class="cmp-v">' + esc(money0(down(v.spent))) + ' из ' + esc(money0(down(v.total))) + '</span></div>' +
-          '<div class="cmp-track"><i class="' + (v.spent > v.total + 0.005 ? 'over' : '') + '" style="width:' + Math.min(100, (v.spent / scale) * 100).toFixed(1) + '%"></i>' +
-          '<b style="left:' + Math.min(99, (v.total / scale) * 100).toFixed(1) + '%"></b></div></li>';
-      }).join('') + '</ul>' +
-        '<ul class="legend"><li><i class="lg ok"></i>потрачено</li><li><i class="lg" style="background:var(--fg);width:3px"></i>бюджет месяца</li></ul>';
-      if (idx > 0) {
-        const prev = S.months[keys[idx - 1]];
-        const pk = keyParts(keys[idx - 1]);
-        const prevDim = new Date(pk.y, pk.m0 + 1, 0).getDate();
-        const dd = Math.min(elapsed, prevDim);
-        const prevSame = sumAmt(prev.expenses.filter((e) => parseInt(String(e.date).slice(8, 10), 10) <= dd));
-        const curSame = sumAmt(m.expenses.filter((e) => parseInt(String(e.date).slice(8, 10), 10) <= dd));
+      html += '<ul class="cmp-list">' + vals.slice().reverse().map((v) =>
+        '<li class="cmp' + (v.p.id === p.id ? ' sel' : '') + '"><div class="cmp-head"><span class="cmp-m">' + esc(fmtRange(v.p, now)) + '</span>' +
+        '<span class="cmp-v">' + esc(money0(down(v.spent))) + ' из ' + esc(money0(down(v.total))) + '</span></div>' +
+        '<div class="cmp-track"><i class="' + (v.spent > v.total + 0.005 ? 'over' : '') + '" style="width:' + Math.min(100, (v.spent / scale) * 100).toFixed(1) + '%"></i>' +
+        '<b style="left:' + Math.min(99, (v.total / scale) * 100).toFixed(1) + '%"></b></div></li>'
+      ).join('') + '</ul>' +
+        '<ul class="legend"><li><i class="lg ok"></i>потрачено</li><li><i class="lg" style="background:var(--fg);width:3px"></i>бюджет периода</li></ul>';
+      if (idx > 0 && elapsed > 0) {
+        const prev = ps[idx - 1];
+        const dd = Math.min(elapsed, daysIn(prev));
+        const prevEnd = addDays(prev.start, dd - 1);
+        const curEnd = addDays(p.start, dd - 1);
+        const prevSame = sumAmt(expensesOf(prev).filter((e) => e.date <= prevEnd));
+        const curSame = sumAmt(list.filter((e) => e.date <= curEnd));
         const diff = curSame - prevSame;
         const word = Math.abs(diff) < 0.5 ? 'столько же' : (diff > 0 ? 'на ' + money0(down(diff)) + ' больше' : 'на ' + money0(down(-diff)) + ' меньше');
-        html += '<p class="note">К ' + dd + '-му числу в прошлом месяце было потрачено ' + esc(money0(down(prevSame))) + ', в этом ' + esc(money0(down(curSame))) + ': ' + esc(word) + '.</p>';
+        html += '<p class="note">За первые ' + dd + NB + plural(dd, 'день', 'дня', 'дней') + ' прошлого периода было потрачено ' + esc(money0(down(prevSame))) + ', в этом ' + esc(money0(down(curSame))) + ': ' + esc(word) + '.</p>';
       }
     }
     html += '</div>';
@@ -970,7 +1161,7 @@
     const entries = jar.entries;
     const total = r2(sumAmt(entries));
     const goal = jar.goal;
-    const k = monthKeyOf(now);
+    const k = S.today.slice(0, 7);
     const monthEntries = entries.filter((e) => String(e.date).slice(0, 7) === k);
     const saved = sumAmt(monthEntries.filter((e) => e.amount > 0));
     const taken = -sumAmt(monthEntries.filter((e) => e.amount < 0));
@@ -1015,27 +1206,37 @@
   const ARROW_L = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
   const ARROW_R = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
 
-  /* ---------- sheets ---------- */
+  /* ---------- number on the app icon (installed web app only) ---------- */
 
-  let sheetMode = 'new';
-  let prevInfo = null;
-  let restoreArmed = null;
-  let jarMode = 'edit';
-  let jarDeleteArmed = null;
-
-  function hintVisible() {
-    let dismissed = false;
-    try { dismissed = localStorage.getItem(LS_KEY + '-hint') === '1'; } catch (err) { dismissed = false; }
-    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
-    const standalone = window.navigator.standalone === true ||
-      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-    return ios && !standalone && !dismissed;
+  const badgeSupported = () => typeof navigator.setAppBadge === 'function' && typeof Notification !== 'undefined';
+  function syncBadge() {
+    if (!S.settings.badge || !badgeSupported() || Notification.permission !== 'granted') return;
+    try {
+      if (S.badgeValue > 0) {
+        const r = navigator.setAppBadge(S.badgeValue);
+        if (r && r.catch) r.catch(() => {});
+      } else if (navigator.clearAppBadge) {
+        const r = navigator.clearAppBadge();
+        if (r && r.catch) r.catch(() => {});
+      }
+    } catch (err) { /* the badge is optional */ }
+  }
+  function clearBadge() {
+    try {
+      if (navigator.clearAppBadge) {
+        const r = navigator.clearAppBadge();
+        if (r && r.catch) r.catch(() => {});
+      }
+    } catch (err) { /* ignore */ }
   }
 
+  /* ---------- backup ---------- */
+
+  let restoreArmed = null;
   function backupMsg(text) { $('#backupMsg').textContent = text; }
 
   function copyBackup() {
-    const text = JSON.stringify({ app: 'karmanny-byudzhet', v: 2, docs: localDocs });
+    const text = JSON.stringify({ app: 'karmanny-byudzhet', v: 3, docs: localDocs });
     const fallback = () => {
       const box = $('#restoreBox');
       box.value = text;
@@ -1073,7 +1274,7 @@
     btn.textContent = 'Восстановить из вставленного';
     const docs = {};
     Object.keys(obj.docs).forEach((k) => {
-      if (/^(settings|savings|m-\d{4}-\d{2})$/.test(k)) docs[k] = obj.docs[k];
+      if (/^(settings|savings|periods|expenses|m-\d{4}-\d{2})$/.test(k)) docs[k] = obj.docs[k];
     });
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(docs));
@@ -1081,8 +1282,7 @@
       backupMsg('Не удалось записать данные в браузер.');
       return;
     }
-    localDocs = docs;
-    applyDocs(localDocs);
+    loadDocs(docs);
     $('#restoreBox').value = '';
     backupMsg('');
     closeSheets();
@@ -1090,8 +1290,17 @@
     showToast('Данные восстановлены');
   }
 
+  /* ---------- sheets ---------- */
+
+  let sheetMode = 'new';
+  let prevInfo = null;
+  let jarMode = 'edit';
+  let jarDeleteArmed = null;
+  let periodDeleteArmed = null;
+
   function openSheet(id) {
     const el = $('#' + id);
+    $('#toast').hidden = true;
     el.hidden = false;
     document.documentElement.style.overflow = 'hidden';
     const input = el.querySelector('input.field');
@@ -1102,53 +1311,85 @@
     document.documentElement.style.overflow = '';
   }
 
-  function openBudget() {
-    const now = new Date();
-    const k = monthKeyOf(now);
-    const m = S.months[k];
-    sheetMode = m ? 'edit' : 'new';
-    $('#budgetEyebrow').textContent = monthName(now.getFullYear(), now.getMonth()) + ' ' + now.getFullYear();
-    $('#budgetTitle').textContent = m ? 'Сумма на месяц' : 'Новый месяц';
-    $('#budgetHint').textContent = m
-      ? 'Измените сумму, и дневной лимит пересчитается.'
-      : 'Сколько вы готовы потратить в этом месяце? По этой сумме я посчитаю, сколько можно тратить в день.';
-    $('#budgetInput').value = m ? String(m.budget) : '';
-    $('#budgetErr').textContent = '';
-    prevInfo = m ? null : findPrev(k);
-    const box = $('#carryBox');
-    if (prevInfo) {
-      const p = keyParts(prevInfo.key);
-      $('#prevName').textContent = monthName(p.y, p.m0).toLowerCase();
-      $('#prevLeft').textContent = money0(prevInfo.left);
-      $('#carrySaveLbl').textContent = 'Отложить в копилку «' + activeJar().name + '»';
-      box.hidden = false;
-      box.querySelector('input[value="none"]').checked = true;
-    } else {
-      box.hidden = true;
+  function updateRangeHint() {
+    const b = parseAmt($('#budgetInput').value);
+    const s = $('#periodStart').value;
+    const e = $('#periodEnd').value;
+    let t = '';
+    if (isDate(s) && isDate(e) && s <= e) {
+      const n = diffDays(s, e) + 1;
+      t = n + ' ' + plural(n, 'день', 'дня', 'дней');
+      if (b > 0) t += ' · в среднем ' + money0(Math.floor(b / n)) + ' в день';
     }
+    $('#rangeHint').textContent = t;
+  }
+
+  function refreshCarry() {
+    const s = $('#periodStart').value;
+    const info = sheetMode === 'new' && isDate(s) ? findPrev(s) : null;
+    const same = !!(info && prevInfo && info.p.id === prevInfo.p.id);
+    prevInfo = info;
+    const box = $('#carryBox');
+    if (!info) { box.hidden = true; return; }
+    $('#prevName').textContent = fmtRange(info.p, new Date());
+    $('#prevLeft').textContent = money0(info.left);
+    $('#carrySaveLbl').textContent = 'Отложить в копилку «' + activeJar().name + '»';
+    if (!same) box.querySelector('input[value="none"]').checked = true;
+    box.hidden = false;
+  }
+
+  function openPeriod(id) {
+    const p = id ? S.periods.filter((x) => x.id === id)[0] : null;
+    S.editPeriodId = p ? p.id : null;
+    sheetMode = p ? 'edit' : 'new';
+    $('#budgetTitle').textContent = p ? 'Бюджет на период' : 'Новый период';
+    $('#budgetHint').textContent = p
+      ? 'Измените сумму или даты, и дневной лимит пересчитается.'
+      : 'Сколько вы готовы потратить и на какие даты? По этой сумме я посчитаю, сколько можно тратить в день.';
+    $('#budgetInput').value = p ? String(p.budget) : '';
+    let start, end;
+    if (p) {
+      start = p.start;
+      end = p.end;
+    } else {
+      const act = periodAt(S.today);
+      start = act ? addDays(act.end, 1) : S.today;
+      end = lastOfMonth(start);
+      const after = S.periods.filter((x) => x.start >= start)[0];
+      if (after && end >= after.start) end = addDays(after.start, -1);
+      if (end < start) end = start;
+    }
+    $('#periodStart').value = start;
+    $('#periodEnd').value = end;
+    $('#budgetErr').textContent = '';
+    prevInfo = null;
+    refreshCarry();
+    const del = $('#periodDelete');
+    del.hidden = !p;
+    del.textContent = 'Удалить период';
+    clearTimeout(periodDeleteArmed);
+    periodDeleteArmed = null;
+    updateRangeHint();
     openSheet('budgetSheet');
   }
 
-  function maybePrompt(now) {
+  function maybePrompt(act) {
     if (S.promptShown) return;
-    if (S.months[monthKeyOf(now)]) return;
+    if (act || nextPeriod(S.today)) return;
     S.promptShown = true;
-    openBudget();
+    openPeriod(null);
   }
 
   function openEdit(id) {
-    const now = new Date();
-    const k = monthKeyOf(now);
-    const m = S.months[k];
-    if (!m) return;
-    const e = m.expenses.filter((x) => x.id === id)[0];
-    if (!e) return;
+    const act = periodAt(S.today);
+    const e = S.expenses.filter((x) => x.id === id)[0];
+    if (!act || !e) return;
     S.editId = id;
     $('#editAmount').value = String(e.amount);
     $('#editNote').value = e.note || '';
     const dt = $('#editDate');
-    dt.min = k + '-01';
-    dt.max = dateStr(now);
+    dt.min = act.start;
+    dt.max = S.today;
     dt.value = e.date;
     $('#editCat').value = catOf(e.cat).id;
     $('#editErr').textContent = '';
@@ -1188,15 +1429,8 @@
   /* ---------- actions ---------- */
 
   function removeItem(kind, id) {
-    let key, list;
-    if (kind === 'expense') {
-      const k = monthKeyOf(new Date());
-      key = 'm-' + k;
-      list = S.months[k].expenses;
-    } else {
-      key = 'savings';
-      list = activeJar().entries;
-    }
+    const key = kind === 'expense' ? 'expenses' : 'savings';
+    const list = kind === 'expense' ? S.expenses : activeJar().entries;
     const idx = list.findIndex((e) => e.id === id);
     if (idx < 0) return;
     const item = list[idx];
@@ -1212,10 +1446,41 @@
     if (!el) return;
     const a = el.dataset.act;
     if (a === 'tab') { S.tab = el.dataset.tab; render(); window.scrollTo(0, 0); }
-    else if (a === 'open-budget') openBudget();
+    else if (a === 'open-budget') openPeriod(null);
+    else if (a === 'edit-period') openPeriod(el.dataset.id);
+    else if (a === 'range') {
+      const s = isDate($('#periodStart').value) ? $('#periodStart').value : S.today;
+      $('#periodStart').value = s;
+      $('#periodEnd').value = el.dataset.r === 'month' ? lastOfMonth(s) : addDays(s, parseInt(el.dataset.r, 10) - 1);
+      updateRangeHint();
+    }
+    else if (a === 'delete-period') {
+      const p = S.periods.filter((x) => x.id === S.editPeriodId)[0];
+      if (!p) return;
+      const cnt = expensesOf(p).length;
+      if (!periodDeleteArmed) {
+        el.textContent = 'Точно удалить' + (cnt ? ' вместе с тратами (' + cnt + ')' : '') + '?';
+        periodDeleteArmed = setTimeout(() => { periodDeleteArmed = null; el.textContent = 'Удалить период'; }, 5000);
+        return;
+      }
+      clearTimeout(periodDeleteArmed);
+      periodDeleteArmed = null;
+      S.periods = S.periods.filter((x) => x.id !== p.id);
+      S.expenses = S.expenses.filter((x) => !(x.date >= p.start && x.date <= p.end));
+      persist('periods');
+      persist('expenses');
+      S.promptShown = true;
+      closeSheets();
+      render();
+      showToast('Период удалён');
+    }
     else if (a === 'open-settings') {
       $('#currencySel').value = cur();
       $('#storageNote').textContent = 'Записи хранятся только на этом устройстве. Если открыть страницу в Safari и через иконку на экране «Домой», записи там могут оказаться разными. На другом устройстве страница будет пустой, поэтому время от времени делайте резервную копию.';
+      const canBadge = badgeSupported() && isStandalone();
+      $('#badgeBox').hidden = !canBadge;
+      $('#badgeMsg').textContent = '';
+      if (canBadge) $('#badgeToggle').checked = !!S.settings.badge && Notification.permission === 'granted';
       openSheet('settingsSheet');
     }
     else if (a === 'close-sheet') closeSheets();
@@ -1235,9 +1500,9 @@
       if (id) removeItem('expense', id);
     }
     else if (a === 'stats-prev' || a === 'stats-next') {
-      const keys = Object.keys(S.months).sort();
-      const i = keys.indexOf(S.statsKey) + (a === 'stats-prev' ? -1 : 1);
-      if (i >= 0 && i < keys.length) { S.statsKey = keys[i]; render(); }
+      const ps = S.periods;
+      const i = ps.findIndex((x) => x.id === S.statsId) + (a === 'stats-prev' ? -1 : 1);
+      if (i >= 0 && i < ps.length) { S.statsId = ps[i].id; render(); }
     }
     else if (a === 'select-jar') {
       if (S.savings.active !== el.dataset.id) mutate('savings', () => { S.savings.active = el.dataset.id; });
@@ -1274,44 +1539,40 @@
     if (e.key === 'Escape') closeSheets();
   });
 
-  function checkDate(ds, now) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) return false;
-    return ds.slice(0, 7) === monthKeyOf(now) && ds <= dateStr(now);
+  function checkDate(ds, act) {
+    return !!act && isDate(ds) && ds >= act.start && ds <= S.today && ds <= act.end;
   }
 
   $('#expenseForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const now = new Date();
-    const k = monthKeyOf(now);
-    const m = S.months[k];
-    if (!m) { openBudget(); return; }
+    const act = periodAt(S.today);
+    if (!act) { openPeriod(null); return; }
     const v = parseAmt($('#expAmount').value);
     if (!(v > 0)) { $('#expErr').textContent = 'Введите сумму больше нуля, например 350 или 12,5.'; return; }
     const ds = $('#expDate').value;
-    if (!checkDate(ds, now)) { $('#expErr').textContent = 'Выберите дату в этом месяце, не позже сегодняшней.'; return; }
+    if (!checkDate(ds, act)) { $('#expErr').textContent = 'Выберите дату внутри периода, не позже сегодняшней.'; return; }
     $('#expErr').textContent = '';
     const note = $('#expNote').value.trim();
     const cat = $('#expCat').value;
-    mutate('m-' + k, () => { m.expenses.push({ id: newId(), amount: v, note: note, cat: cat, date: ds, t: Date.now() }); });
+    mutate('expenses', () => { S.expenses.push({ id: newId(), amount: v, note: note, cat: cat, date: ds, t: Date.now() }); });
     $('#expAmount').value = '';
     $('#expNote').value = '';
+    $('#expDate').value = S.today;
     $('#expAmount').focus();
   });
 
   $('#editForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const now = new Date();
-    const k = monthKeyOf(now);
-    const m = S.months[k];
-    const item = m ? m.expenses.filter((x) => x.id === S.editId)[0] : null;
-    if (!item) { closeSheets(); return; }
+    const act = periodAt(S.today);
+    const item = S.expenses.filter((x) => x.id === S.editId)[0];
+    if (!act || !item) { closeSheets(); return; }
     const v = parseAmt($('#editAmount').value);
     if (!(v > 0)) { $('#editErr').textContent = 'Введите сумму больше нуля.'; return; }
     const ds = $('#editDate').value;
-    if (!checkDate(ds, now)) { $('#editErr').textContent = 'Выберите дату в этом месяце, не позже сегодняшней.'; return; }
+    if (!checkDate(ds, act)) { $('#editErr').textContent = 'Выберите дату внутри периода, не позже сегодняшней.'; return; }
     const note = $('#editNote').value.trim();
     const cat = $('#editCat').value;
-    mutate('m-' + k, () => { item.amount = v; item.note = note; item.date = ds; item.cat = cat; });
+    mutate('expenses', () => { item.amount = v; item.note = note; item.date = ds; item.cat = cat; });
     closeSheets();
     showToast('Трата изменена');
   });
@@ -1342,29 +1603,46 @@
     $('#saveNote').value = '';
   });
 
+  $('#budgetForm').addEventListener('input', updateRangeHint);
+  ['input', 'change'].forEach((ev) => {
+    $('#periodStart').addEventListener(ev, refreshCarry);
+  });
+
   $('#budgetForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const now = new Date();
-    const k = monthKeyOf(now);
+    const fail = (t) => { $('#budgetErr').textContent = t; };
     const v = parseAmt($('#budgetInput').value);
-    if (!(v > 0)) { $('#budgetErr').textContent = 'Введите сумму больше нуля.'; return; }
-    if (sheetMode === 'edit' && S.months[k]) {
-      mutate('m-' + k, () => { S.months[k].budget = v; });
+    if (!(v > 0)) { fail('Введите сумму больше нуля.'); return; }
+    const s = $('#periodStart').value;
+    const en = $('#periodEnd').value;
+    if (!isDate(s) || !isDate(en)) { fail('Укажите обе даты.'); return; }
+    if (en < s) { fail('Дата окончания раньше даты начала.'); return; }
+    if (diffDays(s, en) + 1 > 366) { fail('Период не может быть длиннее 366 дней.'); return; }
+    if (en < S.today) { fail('Дата окончания не может быть раньше сегодняшней.'); return; }
+    const editing = sheetMode === 'edit' ? S.periods.filter((x) => x.id === S.editPeriodId)[0] : null;
+    if (sheetMode === 'edit' && !editing) { closeSheets(); return; }
+    const clash = S.periods.filter((x) => x !== editing && x.start <= en && s <= x.end)[0];
+    if (clash) { fail('Эти даты пересекаются с периодом ' + fmtRange(clash, now) + '. Выберите другие даты.'); return; }
+    if (editing) {
+      const outside = expensesOf(editing).filter((x) => x.date < s || x.date > en).length;
+      if (outside) { fail('В этом периоде есть траты (' + outside + ') вне новых дат. Измените даты или сначала удалите эти траты.'); return; }
+      mutate('periods', () => { editing.budget = v; editing.start = s; editing.end = en; sortPeriods(); });
     } else {
       const choice = prevInfo ? $('#budgetForm input[name="carry"]:checked').value : 'none';
-      S.months[k] = { budget: v, carry: choice === 'carry' ? prevInfo.left : 0, settled: '', expenses: [] };
-      persist('m-' + k);
+      const np = { id: newId(), start: s, end: en, budget: v, carry: choice === 'carry' ? prevInfo.left : 0, settled: '' };
+      S.periods.push(np);
+      sortPeriods();
       if (prevInfo) {
-        const pm = S.months[prevInfo.key];
-        pm.settled = choice;
-        persist('m-' + prevInfo.key);
+        prevInfo.p.settled = choice;
         if (choice === 'save') {
-          const p = keyParts(prevInfo.key);
-          activeJar().entries.push({ id: newId(), amount: prevInfo.left, note: 'Остаток за ' + monthName(p.y, p.m0).toLowerCase(), date: dateStr(now), t: Date.now() });
+          activeJar().entries.push({ id: newId(), amount: prevInfo.left, note: 'Остаток за ' + fmtRange(prevInfo.p, now), date: S.today, t: Date.now() });
           persist('savings');
         }
       }
+      persist('periods');
     }
+    S.statsId = '';
     closeSheets();
     render();
   });
@@ -1390,6 +1668,28 @@
       mutate('savings', () => { jar.name = name; jar.goal = goal; });
     }
     closeSheets();
+  });
+
+  $('#badgeToggle').addEventListener('change', () => {
+    const on = $('#badgeToggle').checked;
+    const msg = $('#badgeMsg');
+    msg.textContent = '';
+    if (!on) {
+      mutate('settings', () => { S.settings.badge = false; });
+      clearBadge();
+      return;
+    }
+    let req = null;
+    try { req = Notification.requestPermission(); } catch (err) { req = null; }
+    Promise.resolve(req).then((perm) => {
+      if (perm === 'granted') {
+        mutate('settings', () => { S.settings.badge = true; });
+        msg.textContent = 'Включено. Число обновляется, когда вы открываете приложение.';
+      } else {
+        $('#badgeToggle').checked = false;
+        msg.textContent = 'Нет разрешения. Откройте «Настройки» → «Уведомления» → «Бюджет» и разрешите уведомления.';
+      }
+    });
   });
 
   const catOptions = CATS.map((c) => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
